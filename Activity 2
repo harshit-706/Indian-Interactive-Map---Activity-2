@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Art Map of India</title>
+    
+    <!-- Leaflet CSS & JS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin=""/>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+
+    <style>
+        :root {
+            --bg-dark: #121212;
+            --panel-bg: #1e1e1e;
+            --gold: #d4af37;
+            --text-light: #e0e0e0;
+            --text-muted: #a0a0a0;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: var(--bg-dark);
+            color: var(--text-light);
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            overflow: hidden;
+        }
+        .header {
+            text-align: center;
+            padding: 20px;
+            background: linear-gradient(90deg, #0a0a0a, #1a1a1a, #0a0a0a);
+            border-bottom: 2px solid var(--gold);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.8);
+            z-index: 10;
+        }
+        .header h1 {
+            margin: 0;
+            color: var(--gold);
+            font-size: 2.2rem;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+        }
+        .header p {
+            margin: 5px 0 0 0;
+            color: var(--text-muted);
+            font-size: 1rem;
+        }
+        .main-container {
+            display: flex;
+            flex: 1;
+            height: calc(100vh - 90px);
+        }
+        #map {
+            flex: 2;
+            height: 100%;
+            background-color: #1a1a1a; 
+            z-index: 1;
+        }
+        .info-panel {
+            flex: 1;
+            background-color: var(--panel-bg);
+            padding: 40px 30px;
+            overflow-y: auto;
+            border-left: 1px solid #333;
+            box-shadow: -5px 0 20px rgba(0,0,0,0.5);
+            z-index: 2;
+        }
+        .placeholder-text {
+            text-align: center;
+            margin-top: 50%;
+            transform: translateY(-50%);
+            color: var(--text-muted);
+            font-size: 1.2rem;
+            font-style: italic;
+        }
+        .info-content {
+            display: none;
+            animation: fadeIn 0.5s ease-in-out;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .info-panel img {
+            width: 100%;
+            max-height: 300px;
+            object-fit: contain;
+            border-radius: 8px;
+            border: 2px solid var(--gold);
+            margin-bottom: 20px;
+            background-color: #000;
+        }
+        .info-panel h2 {
+            color: var(--gold);
+            margin-top: 0;
+            margin-bottom: 5px;
+            font-size: 1.8rem;
+        }
+        .movement-tag {
+            display: inline-block;
+            background: rgba(212, 175, 55, 0.1);
+            color: var(--gold);
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            font-weight: bold;
+            margin-bottom: 20px;
+            border: 1px solid var(--gold);
+        }
+        .info-panel h4 {
+            color: #fff;
+            margin-bottom: 5px;
+            border-bottom: 1px solid #444;
+            padding-bottom: 5px;
+        }
+        .info-panel p {
+            line-height: 1.6;
+            color: #ccc;
+            font-size: 1rem;
+        }
+        .custom-pin {
+            background-color: var(--gold);
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            border: 2px solid #fff;
+            animation: pulse 2s infinite;
+            cursor: pointer;
+        }
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(212, 175, 55, 0.7); }
+            70% { box-shadow: 0 0 0 15px rgba(212, 175, 55, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(212, 175, 55, 0); }
+        }
+        @media (max-width: 900px) {
+            .main-container { flex-direction: column; }
+            #map { flex: 1.5; }
+            .info-panel { flex: 1; border-left: none; border-top: 2px solid var(--gold); }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <h1>Indian Art History Map</h1>
+        <p>Select a glowing marker to explore 13 regional art movements across all directions of India.</p>
+    </div>
+
+    <div class="main-container">
+        <div id="map"></div>
+        <div class="info-panel" id="info-panel">
+            <div class="placeholder-text" id="placeholder">
+                <p>Interactive Canvas Ready.</p>
+                <p>Click on any marker to discover its history.</p>
+            </div>
+            <div class="info-content" id="info-content">
+                <img id="art-image" src="" alt="Artwork">
+                <h2 id="art-title">Location Name</h2>
+                <div class="movement-tag" id="art-movement">Art Movement</div>
+                <h4>Historical Context & Description</h4>
+                <p id="art-desc">Description goes here.</p>
+                <h4>Key Artists / Creators</h4>
+                <p id="art-artists">Artists go here.</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Initialize Map
+        const map = L.map('map', { zoomControl: false }).setView([22.5937, 78.9629], 5);
+        L.control.zoom({ position: 'bottomright' }).addTo(map);
+
+        // API Key-Free Esri Dark Base Map
+        L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}', {
+            attribution: 'Tiles &copy; Esri &mdash; Esri, DeLorme, NAVTEQ',
+            maxZoom: 10,
+            minZoom: 4
+        }).addTo(map);
+
+        const artIcon = L.divIcon({ className: 'custom-pin', iconSize: [16, 16], iconAnchor: [8, 8] });
+
+        // Image proxy added to bypass local 'file:///' CORS blocks
+        const proxy = "https://wsrv.nl/?url=";
+
+        const locations = [
+            { lat: 10.7867, lng: 79.1378, title: "Thanjavur, Tamil Nadu", movement: "Tanjore Painting", artists: "Raju and Naidu communities", desc: "Characterized by rich, flat colors, simple iconic composition, and glittering gold foils over delicate gesso work.", img: proxy + "upload.wikimedia.org/wikipedia/commons/thumb/c/ca/Tanjore_Painting_of_Saraswati.jpg/600px-Tanjore_Painting_of_Saraswati.jpg" },
+            { lat: 26.3495, lng: 86.0824, title: "Mithila Region, Bihar", movement: "Madhubani Folk Art", artists: "Generations of women in the Mithila region", desc: "Complex geometric patterns created with natural dyes, utilizing twigs, matchsticks, and nib-pens.", img: proxy + "upload.wikimedia.org/wikipedia/commons/thumb/1/1a/Madhubani_Art.jpg/600px-Madhubani_Art.jpg" },
+            { lat: 32.0998, lng: 76.2691, title: "Kangra Valley, Himachal Pradesh", movement: "Pahari Miniature Painting", artists: "Masters like Nainsukh and Manaku", desc: "Famed for its lyrical themes, naturalism, and delicate feminine features inspired by the Gitagovinda.", img: proxy + "upload.wikimedia.org/wikipedia/commons/thumb/3/36/Radha_and_Krishna_in_the_Grove.jpg/600px-Radha_and_Krishna_in_the_Grove.jpg" },
+            { lat: 20.5519, lng: 75.7033, title: "Ajanta Caves, Maharashtra", movement: "Buddhist Fresco Murals", artists: "Buddhist monks and skilled artisans", desc: "Masterpieces of ancient Indian art depicting the Jataka tales with expressive shading and emotional depth.", img: proxy + "upload.wikimedia.org/wikipedia/commons/thumb/1/10/Ajanta_Padmapani.jpg/600px-Ajanta_Padmapani.jpg" },
+            { lat: 22.9377, lng: 77.6137, title: "Bhimbetka, Madhya Pradesh", movement: "Prehistoric Rock Art", artists: "Early hunter-gatherers", desc: "The earliest traces of human life in India, featuring vivid paintings of hunting scenes and community life.", img: proxy + "upload.wikimedia.org/wikipedia/commons/thumb/f/fa/Bhimbetka_cave_paintings.jpg/600px-Bhimbetka_cave_paintings.jpg" },
+            { lat: 26.5726, lng: 74.8617, title: "Kishangarh, Rajasthan (North/West)", movement: "Kishangarh Miniature Painting", artists: "Nihal Chand and 18th-century royal artisans", desc: "Renowned for the exquisite 'Bani Thani' portraiture, featuring distinctive elongated facial features, arched eyebrows, and prominent lotus motifs.", img: proxy + "upload.wikimedia.org/wikipedia/commons/thumb/1/1c/Bani_Thani.jpg/600px-Bani_Thani.jpg" },
+            { lat: 12.2958, lng: 76.6394, title: "Mysuru, Karnataka (South)", movement: "Mysore Painting", artists: "Wadiyar dynasty court painters", desc: "Elegant classical South Indian painting style recognized for its muted color palettes, immense attention to detail, and delicate use of fine gold leaf.", img: proxy + "upload.wikimedia.org/wikipedia/commons/thumb/f/f3/Saraswathi_-_Mysore_Painting.jpg/600px-Saraswathi_-_Mysore_Painting.jpg" },
+            { lat: 13.7497, lng: 79.7033, title: "Srikalahasti, Andhra Pradesh (South)", movement: "Kalamkari", artists: "Generational textile artisans", desc: "A traditional method of hand-painting on treated cotton using a tamarind pen and natural, earth-based dyes to depict complex Hindu mythology.", img: proxy + "upload.wikimedia.org/wikipedia/commons/thumb/8/87/Kalamkari_art.jpg/600px-Kalamkari_art.jpg" },
+            { lat: 19.8517, lng: 85.8078, title: "Raghurajpur, Odisha (East)", movement: "Pattachitra", artists: "The local Chitrakar community", desc: "A traditional cloth-based scroll painting known for its strict, intricate borders and vivid depictions of Lord Jagannath and Vaishnava legends.", img: proxy + "upload.wikimedia.org/wikipedia/commons/thumb/d/d4/Patachitra_of_Odisha.jpg/600px-Patachitra_of_Odisha.jpg" },
+            { lat: 22.5218, lng: 88.3475, title: "Kalighat, West Bengal (East)", movement: "Kalighat Painting", artists: "Traditional scroll painters (Patuas)", desc: "Originating in the 19th century as temple souvenirs, this style is characterized by fast, sweeping brushstrokes capturing religious deities and satirical society scenes.", img: proxy + "upload.wikimedia.org/wikipedia/commons/thumb/4/4e/Kalighat_painting_Shiva_and_Parvati.jpg/600px-Kalighat_painting_Shiva_and_Parvati.jpg" },
+            { lat: 19.6967, lng: 72.7699, title: "Palghar, Maharashtra (West)", movement: "Warli Folk Art", artists: "Indigenous Warli tribeswomen", desc: "A rudimentary but striking art style utilizing white rice paste on red ochre mud to create rhythmic geometric patterns representing nature and harvest rituals.", img: proxy + "upload.wikimedia.org/wikipedia/commons/thumb/0/07/Warli_painting.jpg/600px-Warli_painting.jpg" },
+            { lat: 26.9535, lng: 94.1673, title: "Majuli, Assam (Northeast)", movement: "Satriya Mask Making", artists: "Monks of the local Sattras", desc: "The creation of elaborate, lightweight masks from bamboo, clay, and cow dung, used vividly in traditional Vaishnavite dance-dramas (Bhaona).", img: proxy + "upload.wikimedia.org/wikipedia/commons/thumb/2/23/Mask_of_Majuli.jpg/600px-Mask_of_Majuli.jpg" },
+            { lat: 19.2081, lng: 81.9360, title: "Bastar, Chhattisgarh (Central)", movement: "Dhokra Metal Art", artists: "Traditional metalsmith tribes", desc: "An ancient lost-wax metal casting craft renowned for its intricate wire-work finish, rustic aesthetic, and primitive tribal motifs.", img: proxy + "upload.wikimedia.org/wikipedia/commons/thumb/3/3f/Dhokra_Art_of_Bastar.jpg/600px-Dhokra_Art_of_Bastar.jpg" }
+        ];
+
+        locations.forEach(loc => {
+            const marker = L.marker([loc.lat, loc.lng], {icon: artIcon}).addTo(map);
+            
+            marker.on('click', () => {
+                // Clear placeholder
+                document.getElementById('placeholder').style.display = 'none';
+                const contentDiv = document.getElementById('info-content');
+                
+                // Trigger reflow for animation
+                contentDiv.style.display = 'none';
+                setTimeout(() => { contentDiv.style.display = 'block'; }, 10);
+
+                // Inject text data
+                document.getElementById('art-title').innerText = loc.title;
+                document.getElementById('art-movement').innerText = loc.movement;
+                document.getElementById('art-desc').innerText = loc.desc;
+                document.getElementById('art-artists').innerText = loc.artists;
+                
+                // Inject image data
+                const imgEl = document.getElementById('art-image');
+                imgEl.src = loc.img;
+                imgEl.alt = loc.title;
+
+                // Animate map to location
+                map.flyTo([loc.lat, loc.lng + 2], 6, { animate: true, duration: 1.5 });
+            });
+        });
+    </script>
+</body>
+</html>
